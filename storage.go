@@ -75,7 +75,9 @@ func (s *PostgresStore) UpdateAccount(*Account) error {
 }
 
 func (s *PostgresStore) DeleteAccount(id uuid.UUID) error {
-	return nil
+	// soft delete in production: mark account as deleted instead of hard deleting
+	_, err := s.db.Query("delete from account where id = $1", id)
+	return err
 }
 
 func (s *PostgresStore) GetAccountByID(id uuid.UUID) (*Account, error) {
@@ -88,7 +90,7 @@ func (s *PostgresStore) GetAccountByID(id uuid.UUID) (*Account, error) {
 		return scanIntoAccount(rows)
 	}
 
-	return nil, fmt.Errorf("account %d not found", id)
+	return nil, fmt.Errorf("account %s not found", id)
 }
 
 func (s *PostgresStore) GetAccounts() ([]*Account, error) {
