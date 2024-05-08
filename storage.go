@@ -9,7 +9,7 @@ import (
 )
 
 type Storage interface {
-	CreateAccount(*Account) error
+	CreateAccount(*Account) (uuid.UUID, error)
 	DeleteAccount(uuid.UUID) error
 	UpdateAccount(*Account) error
 	GetAccounts() ([]*Account, error)
@@ -56,18 +56,19 @@ func (s *PostgresStore) createAccountTable() error {
 	return err
 }
 
-func (s *PostgresStore) CreateAccount(acc *Account) error {
+func (s *PostgresStore) CreateAccount(acc *Account) (uuid.UUID, error) {
 	query := `insert into account (
 		first_name, last_name, number, balance, created_at
-	) values ($1, $2, $3, $4, $5)`
+	) values ($1, $2, $3, $4, $5) returning id`
 
-	resp, err := s.db.Query(query, acc.FirstName, acc.LastName, acc.Number, acc.Balance, acc.CreatedAt)
+	var id uuid.UUID
+	err := s.db.QueryRow(query, acc.FirstName, acc.LastName, acc.Number, acc.Balance, acc.CreatedAt).Scan(&id)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	fmt.Printf("%v\n", resp)
-	return nil
+	fmt.Printf("%v\n", id)
+	return id, nil
 }
 
 func (s *PostgresStore) UpdateAccount(*Account) error {
