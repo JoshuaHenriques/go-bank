@@ -31,7 +31,6 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/login", makeHTTPHandleFunc(s.handleLogin))
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
-	router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
 
@@ -130,15 +129,6 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	if _, err := s.store.CreateAccount(account); err != nil {
 		return err
 	}
-	// account.ID = accID
-
-	// tokenString, err := createJWT(account)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // can be returned to the client for localStorage
-	// fmt.Println("JWT token: ", tokenString)
 
 	defer r.Body.Close()
 	return WriteJSON(w, http.StatusOK, account)
@@ -156,16 +146,6 @@ func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) 
 
 	defer r.Body.Close()
 	return WriteJSON(w, http.StatusOK, map[string]uuid.UUID{"deleted": id})
-}
-
-func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
-	req := &TransferRequest{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		return err
-	}
-	defer r.Body.Close()
-
-	return WriteJSON(w, http.StatusOK, req)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {

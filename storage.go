@@ -11,7 +11,6 @@ import (
 type Storage interface {
 	CreateAccount(*Account) (uuid.UUID, error)
 	DeleteAccount(uuid.UUID) error
-	UpdateAccount(*Account) error
 	GetAccounts() ([]*Account, error)
 	GetAccountByID(uuid.UUID) (*Account, error)
 	GetAccountByEmail(string) (*Account, error)
@@ -69,12 +68,7 @@ func (s *PostgresStore) CreateAccount(acc *Account) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 
-	// fmt.Printf("%v\n", id)
 	return id, nil
-}
-
-func (s *PostgresStore) UpdateAccount(*Account) error {
-	return nil
 }
 
 func (s *PostgresStore) DeleteAccount(id uuid.UUID) error {
