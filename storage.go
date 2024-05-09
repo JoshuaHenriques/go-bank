@@ -14,6 +14,7 @@ type Storage interface {
 	UpdateAccount(*Account) error
 	GetAccounts() ([]*Account, error)
 	GetAccountByID(uuid.UUID) (*Account, error)
+	GetAccountByEmail(string) (*Account, error)
 }
 
 type PostgresStore struct {
@@ -21,7 +22,6 @@ type PostgresStore struct {
 }
 
 func NewPostgresStore() (*PostgresStore, error) {
-	// connStr := "host=192.168.2.18:8080 user=postgres dbname=postgres password=postgres sslmode=verify-full"
 	connStr := "postgresql://postgres:example@192.168.2.18?sslmode=disable"
 	db, err := sql.Open("postgres", connStr)
 
@@ -47,6 +47,8 @@ func (s *PostgresStore) createAccountTable() error {
 		id uuid default uuid_generate_v4(),
 		first_name varchar not null,
 		last_name varchar not null,
+		email varchar not null,
+		password varchar not null,
 		number serial,
 		balance serial,
 		created_at timestamp
@@ -58,16 +60,16 @@ func (s *PostgresStore) createAccountTable() error {
 
 func (s *PostgresStore) CreateAccount(acc *Account) (uuid.UUID, error) {
 	query := `insert into account (
-		first_name, last_name, number, balance, created_at
-	) values ($1, $2, $3, $4, $5) returning id`
+		first_name, last_name, email, password, number, balance, created_at
+	) values ($1, $2, $3, $4, $5, $6, $7) returning id`
 
 	var id uuid.UUID
-	err := s.db.QueryRow(query, acc.FirstName, acc.LastName, acc.Number, acc.Balance, acc.CreatedAt).Scan(&id)
+	err := s.db.QueryRow(query, acc.FirstName, acc.LastName, acc.Email, acc.Password, acc.Number, acc.Balance, acc.CreatedAt).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
 
-	fmt.Printf("%v\n", id)
+	// fmt.Printf("%v\n", id)
 	return id, nil
 }
 
@@ -79,6 +81,19 @@ func (s *PostgresStore) DeleteAccount(id uuid.UUID) error {
 	// soft delete in production: mark account as deleted instead of hard deleting
 	_, err := s.db.Query("delete from account where id = $1", id)
 	return err
+}
+
+func (s *PostgresStore) GetAccountByEmail(email string) (*Account, error) {
+	rows, err := s.db.Query("select * from account where email = $1", email)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+
+	return nil, fmt.Errorf("account %s not found", email)
 }
 
 func (s *PostgresStore) GetAccountByID(id uuid.UUID) (*Account, error) {
@@ -119,6 +134,8 @@ func scanIntoAccount(rows *sql.Rows) (*Account, error) {
 		&account.ID,
 		&account.FirstName,
 		&account.LastName,
+		&account.Email,
+		&account.Password,
 		&account.Number,
 		&account.Balance,
 		&account.CreatedAt)

@@ -28,6 +28,7 @@ func NewApiServer(listenAddr string, store Storage) *APIServer {
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/login", makeHTTPHandleFunc(s.handleLogin))
 	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHTTPHandleFunc(s.handleGetAccountByID), s.store))
 	router.HandleFunc("/transfer", makeHTTPHandleFunc(s.handleTransfer))
@@ -35,6 +36,39 @@ func (s *APIServer) Run() {
 	log.Println("JSON API server running on port: ", s.listenAddr)
 
 	http.ListenAndServe(s.listenAddr, router)
+}
+
+func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != "POST" {
+		return fmt.Errorf("method not allowed %s", r.Method)
+	}
+
+	req := &LoginRequest{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		return err
+	}
+
+	acc, err := s.store.GetAccountByEmail(string(req.Email))
+	if err != nil {
+		WriteJSON(w, http.StatusNotFound, "Email not found")
+		return err
+	}
+
+	if !acc.ValidPassword(req.Password) {
+		return fmt.Errorf("Failed Login")
+	}
+
+	token, err := createJWT(acc)
+	if err != nil {
+		return err
+	}
+
+	resp := &LoginResponse{
+		AccountID: acc.ID,
+		Token:     token,
+	}
+
+	return WriteJSON(w, http.StatusOK, resp)
 }
 
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
@@ -83,25 +117,28 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	createAccountReq := &CreateAccountRequest{}
-	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+	req := &CreateAccountRequest{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return err
 	}
 
-	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
-	accID, err := s.store.CreateAccount(account)
+	account, err := NewAccount(req.FirstName, req.LastName, req.Email, req.Password)
 	if err != nil {
-		return err
-	}
-	account.ID = accID
-
-	tokenString, err := createJWT(account)
-	if err != nil {
-		return err
+		return nil
 	}
 
-	// can be returned to the client for localStorage
-	fmt.Println("JWT token: ", tokenString)
+	if _, err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+	// account.ID = accID
+
+	// tokenString, err := createJWT(account)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// // can be returned to the client for localStorage
+	// fmt.Println("JWT token: ", tokenString)
 
 	defer r.Body.Close()
 	return WriteJSON(w, http.StatusOK, account)
@@ -122,13 +159,13 @@ func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
-	transferReq := &TransferRequest{}
-	if err := json.NewDecoder(r.Body).Decode(transferReq); err != nil {
+	req := &TransferRequest{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return err
 	}
 	defer r.Body.Close()
 
-	return WriteJSON(w, http.StatusOK, transferReq)
+	return WriteJSON(w, http.StatusOK, req)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
