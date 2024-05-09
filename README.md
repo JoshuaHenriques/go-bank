@@ -1,6 +1,6 @@
 # Bank REST API
 
-A simple bank REST API backend tailored for learning and practicing Go, featuring functionalities like user sign-in, JWT authentication, and PostgreSQL database integration.
+A simple bank REST API tailored for learning and practicing Go, featuring functionalities like user sign-in, JWT authentication, and PostgreSQL database integration.
 
 ### Endpoints
 
